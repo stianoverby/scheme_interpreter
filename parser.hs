@@ -18,6 +18,16 @@ readExpr input = case parse parseExpr "lisp" input of
 spaces :: Parser ()
 spaces = skipMany1 space
 
+escapedChars :: Parser String
+escapedChars =  do  char '\\' -- a backslash
+                    x <- oneOf "\\\"nrt" -- either backslash or doublequote
+                    case x of
+                        '\\' -> do return [x]
+                        '"' -> do return [x]
+                        'n' -> do return "\n"
+                        'r' -> do return "r"
+                        't' -> do return "\t"
+
 
 data LispVal =  Atom String
              |  List [LispVal]
@@ -28,9 +38,9 @@ data LispVal =  Atom String
 
 parseString :: Parser LispVal
 parseString =   do  char '"'
-                    x <- many (noneOf "\"")
+                    x <- many $ many1 (noneOf "\\\"") <|> escapedChars
                     char '"'
-                    return $ String x
+                    return $ String (concat x)
 
 parseAtom :: Parser LispVal
 parseAtom = do  first <- letter <|> symbol
@@ -42,7 +52,10 @@ parseAtom = do  first <- letter <|> symbol
                             otherwise -> Atom atom
 
 parseNumber :: Parser LispVal
-parseNumber = liftM (Number . read) $ many1 digit
+-- parseNumber = liftM (Number . read) $ many1 digit
+-- parseNumber = do    x <- many1 digit
+--                     (return . Number . read) x
+parseNumber = many1 digit >>= return . Number . read
 
 parseExpr :: Parser LispVal
 parseExpr = parseAtom
